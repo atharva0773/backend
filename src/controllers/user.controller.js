@@ -5,6 +5,22 @@ import { uploadResult } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/apiresponse.js";
 
 
+const generateAccessAndRefreshToken = async (userId)=>{
+    try{
+        const user = await User.findById(userId)
+      const accessToken  =  user.generateAccessToken()
+      const refreshToken = user.generateRefreshToken()
+
+      user.refreshToken =refreshToken
+      await  user.save({validateBeforeSave: false})
+
+      return {accessToken,refreshToken}
+    }
+    catch(error){
+        throw new ApiError(500,"Something went wrong while generating refresh and access token  ")
+    }
+
+}
 
 const registerUser = asyncHandeler(async (req, res) => {
   // register user
@@ -28,7 +44,7 @@ const registerUser = asyncHandeler(async (req, res) => {
   ) {
     throw new ApiError(400, "Fullname is required");
   }
-  console.log(email,fullname,username);
+  console.log(email, fullname, username);
   // find the user in db
   const existedUser = await User.findOne({
     $or: [{ email }, { username }],
@@ -39,14 +55,18 @@ const registerUser = asyncHandeler(async (req, res) => {
 
   const avatarLocalPath = req.files?.avatar[0]?.path;
 
-//    const coverLocalPath = req.files?.coverImage[0]?.path;
+  //    const coverLocalPath = req.files?.coverImage[0]?.path;
 
-   let coverImageLocalPath;
-    if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
-        coverImageLocalPath = req.files.coverImage[0].path
-    }
+  let coverImageLocalPath;
+  if (
+    req.files &&
+    Array.isArray(req.files.coverImage) &&
+    req.files.coverImage.length > 0
+  ) {
+    coverImageLocalPath = req.files.coverImage[0].path;
+  }
 
-  console.log(avatarLocalPath,coverImageLocalPath); // path
+  console.log(avatarLocalPath, coverImageLocalPath); // path
 
   if (!avatarLocalPath) {
     throw new ApiError(400, "path not found");
@@ -67,7 +87,7 @@ const registerUser = asyncHandeler(async (req, res) => {
     password,
     username: username.toLowerCase(),
   });
-// use to remove some content 
+  // use to remove some content
   const createdUser = await User.findById(user._id).select(
     "-password -refreshToken "
   );
@@ -80,4 +100,74 @@ const registerUser = asyncHandeler(async (req, res) => {
     .json(new ApiResponse(200, createdUser, "User registered successfully"));
 });
 
-export { registerUser };
+const loginUser = asyncHandeler(async (req, res) => {
+  // req body ->> data
+  // username/email
+  // find the user
+  // password check
+  // access and referesh token
+  // send cookie
+
+  const { email, username, password } = req.body;
+
+  if (!username || !email) {
+    throw new ApiError(400, "username or email is required");
+  }
+
+  const user = await User.findOne({
+    $or: [{ email }, { username }],
+  });
+
+  if (!user) {
+    throw new ApiError(404, "User does not exist");
+  }
+
+  const isPasswordValid = await user.isPasswordCorrect(password);
+
+  if (!isPasswordValid) {
+    throw new ApiError(401, "Password incorrect");
+  }
+  const {accessToken,refreshToken}= await 
+  generateAccessAndRefreshToken(user._id)
+
+  const loggedInUser =await  User.findById(user._id).select("-password -refreshToken")
+  const options ={
+    httpOnly:true,
+    secure:true
+  }
+  return res.status(200)
+  .cookie("accessToken",accessToken,options)
+  .cookie("refreshToken",refreshToken,options)
+  .json(
+    new ApiResponse(
+        200,{
+            user:loggedInUser,accessToken,refreshToken
+        },"User logged in Successfully"
+    )
+  )
+
+})
+const logoutUser =asyncHandeler(async(req,res)=>{
+   await User.findByIdAndUpdate(req.user._id,{
+        $set:{
+            refreshToken: undefined
+        }
+    },
+        {
+            new: true
+        }
+    )
+    const options ={
+        httpOnly:true,
+        secure :true
+    }
+
+    return res.status(200)
+    .clearCookie("accessToken",options)
+    .clearCookie("refreshToken",options)
+    .json(new ApiResponse(200,{}," User Logout "))
+})
+
+
+
+export { registerUser, loginUser,logoutUser };
