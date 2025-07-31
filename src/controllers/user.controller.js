@@ -39,16 +39,21 @@ const registerUser = asyncHandeler(async (req, res) => {
 
   const avatarLocalPath = req.files?.avatar[0]?.path;
 
-  const coverLocalPath = req.files?.coverImage[0]?.path;
+//    const coverLocalPath = req.files?.coverImage[0]?.path;
 
-  console.log(avatarLocalPath,coverLocalPath); // path
+   let coverImageLocalPath;
+    if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
+        coverImageLocalPath = req.files.coverImage[0].path
+    }
+
+  console.log(avatarLocalPath,coverImageLocalPath); // path
 
   if (!avatarLocalPath) {
     throw new ApiError(400, "path not found");
   }
 
   const avatar = await uploadResult(avatarLocalPath);
-  const coverImage = await uploadResult(coverLocalPath);
+  const coverImage = await uploadResult(coverImageLocalPath);
 
   if (!avatar) {
     throw new ApiError(400, "Avatar is required");
@@ -62,7 +67,7 @@ const registerUser = asyncHandeler(async (req, res) => {
     password,
     username: username.toLowerCase(),
   });
-
+// use to remove some content 
   const createdUser = await User.findById(user._id).select(
     "-password -refreshToken "
   );
