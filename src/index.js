@@ -1,6 +1,7 @@
 // require('dotenv').config({path:'./env'}) //alternate
 import dotenv from "dotenv";
 import connectDB from "./db/index.js";
+import app from "./app.js"
 
 dotenv.config({
   path: "./env",
@@ -10,7 +11,7 @@ connectDB()  //it return promise
     app.listen(process.env.PORT || 8000, () => {
       console.log(` server is running at port ${process.env.PORT}`);
     })
-    app.on("erroe",(error)=>{
+    app.on("error",(error)=>{
       console.log("ERROR  in main file",error);
       throw error;
     })
